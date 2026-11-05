@@ -9,26 +9,33 @@ jobs:
       - uses: actions/checkout@v4
       - run: unzip -q obhod.zip
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: "17" }
+        with:
+          distribution: temurin
+          java-version: "17"
       - uses: actions/setup-go@v5
-        with: { go-version: "^1.23" }
+        with:
+          go-version: "^1.23"
       - id: ndk
         uses: nttld/setup-ndk@v1
-        with: { ndk-version: r28-beta2, add-to-path: false }
+        with:
+          ndk-version: r28-beta2
+          add-to-path: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
       - name: Test Rust core
         run: cd obhod/core && cargo test
       - name: Build Rust .so
-        env: { ANDROID_NDK_HOME: "${{ steps.ndk.outputs.ndk-path }}" }
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: |
           cargo install cargo-ndk --locked
           cd obhod/core
           cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -o ../android/app/src/main/jniLibs build --release
       - name: Build libbox.aar
-        env: { ANDROID_NDK_HOME: "${{ steps.ndk.outputs.ndk-path }}" }
-                run: |
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: |
           git clone --depth 1 --branch "$SING_BOX_TAG" https://github.com/SagerNet/sing-box /tmp/sing-box
           go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.4
           go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.4
@@ -36,7 +43,8 @@ jobs:
           go run ./cmd/internal/build_libbox -target android
           cp libbox.aar "$GITHUB_WORKSPACE/obhod/android/app/libs/libbox.aar"
       - uses: gradle/actions/setup-gradle@v4
-        with: { gradle-version: "8.9" }
+        with:
+          gradle-version: "8.9"
       - name: Build APK
         run: cd obhod/android && gradle assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
