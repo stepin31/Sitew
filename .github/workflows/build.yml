@@ -1,5 +1,5 @@
 name: build-apk
-on: workflow_dispatch
+on: [push, workflow_dispatch]
 env:
   SING_BOX_TAG: v1.10.7
 jobs:
