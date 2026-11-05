@@ -28,8 +28,10 @@ jobs:
           cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -o ../android/app/src/main/jniLibs build --release
       - name: Build libbox.aar
         env: { ANDROID_NDK_HOME: "${{ steps.ndk.outputs.ndk-path }}" }
-        run: |
+                run: |
           git clone --depth 1 --branch "$SING_BOX_TAG" https://github.com/SagerNet/sing-box /tmp/sing-box
+          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.4
+          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.4
           cd /tmp/sing-box
           go run ./cmd/internal/build_libbox -target android
           cp libbox.aar "$GITHUB_WORKSPACE/obhod/android/app/libs/libbox.aar"
