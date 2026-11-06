@@ -1,53 +1,41 @@
 name: build-apk
 on: [push, workflow_dispatch]
-
 env:
   SING_BOX_TAG: v1.10.7
-
 jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Unpack sources
+      - run: unzip -q obhod.zip
+      - name: Fix gradle config
         run: |
-          if [ -f obhod.zip ]; then
-            unzip -q obhod.zip
-          fi
-
+          printf 'android.useAndroidX=true\norg.gradle.jvmargs=-Xmx3g\n' > obhod/android/gradle.properties
+          sed -i '/org.json:json/d' obhod/android/app/build.gradle.kts
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-
       - uses: actions/setup-go@v5
         with:
-          go-version: "^1.23"
-          cache: false
-
+          go-version: "1.23"
       - id: ndk
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r26d
-          add-to-path: true
-
+          ndk-version: r28-beta2
+          add-to-path: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
-
       - name: Test Rust core
         run: cd obhod/core && cargo test
-
       - name: Build Rust .so
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: |
           cargo install cargo-ndk --locked
           cd obhod/core
-          mkdir -p ../android/app/src/main/jniLibs
           cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -o ../android/app/src/main/jniLibs build --release
-
       - name: Build libbox.aar
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
@@ -57,24 +45,13 @@ jobs:
           go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.4
           cd /tmp/sing-box
           go run ./cmd/internal/build_libbox -target android
-          mkdir -p "$GITHUB_WORKSPACE/obhod/android/app/libs"
           cp libbox.aar "$GITHUB_WORKSPACE/obhod/android/app/libs/libbox.aar"
-
-      - name: Setup Android SDK licenses
-        run: |
-          yes | sdkmanager --licenses || true
-
-      - name: Build APK with Gradle
-        run: |
-          cd obhod/android
-          chmod +x gradlew || true
-          if [ -f gradlew ]; then
-            ./gradlew assembleDebug --no-daemon --stacktrace
-          else
-            gradle assembleDebug --no-daemon --stacktrace
-          fi
-
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Build APK
+        run: cd obhod/android && gradle assembleDebug --no-daemon --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: obhod-apk
-          path: obhod/android/app/build/outputs/apk/debug/*.apk
+          path: obhod/android/app/build/outputs/apk/debug/app-debug.apk
